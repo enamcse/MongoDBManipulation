@@ -24,6 +24,7 @@ import static javax.swing.JOptionPane.NO_OPTION;
 import static javax.swing.JOptionPane.QUESTION_MESSAGE;
 import static javax.swing.JOptionPane.YES_NO_OPTION;
 import static javax.swing.JOptionPane.YES_OPTION;
+import static javax.swing.SwingUtilities.isEventDispatchThread;
 import static javax.swing.WindowConstants.DISPOSE_ON_CLOSE;
 import javax.swing.table.DefaultTableModel;
 import static mongodbmanipulation.Constants.*;
@@ -91,12 +92,14 @@ public class UserInterface extends javax.swing.JFrame {
 //            System.out.println("Column: " + tcl.getColumn());
 //            System.out.println("Old   : " + tcl.getOldValue());
 //            System.out.println("New   : " + tcl.getNewValue());
-            System.out.println("Action: "+e.getActionCommand());
-            if(columnUpdating) return;
+            System.out.println("Action: " + e.getActionCommand());
+            if (columnUpdating) {
+                return;
+            }
             int row = tcl.getRow();
             int col = tcl.getColumn();
-            Document where = new Document("_id",  model.getValueAt(row, _idcol));
-            Document what = new Document("$set", new Document((String) columns[col],model.getValueAt(row, col)));
+            Document where = new Document("_id", model.getValueAt(row, _idcol));
+            Document what = new Document("$set", new Document((String) columns[col], model.getValueAt(row, col)));
             collections.updateOne(Filters.eq("_id", where.get("_id")), what);
         }
     };
@@ -496,10 +499,13 @@ public class UserInterface extends javax.swing.JFrame {
     }//GEN-LAST:event_jButtonDropCollectionActionPerformed
 
     public boolean refreshTable() {
+        System.out.println("Ans:" + isEventDispatchThread());
         collections = db.getCollection((String) jComboBoxCollectionName.getSelectedItem());
-        if(collections.count()>1000){
-            int ret = JOptionPane.showConfirmDialog(this, "The table contains more than thousand row.\nThis may slow down the process and could cause Memory error.Are you sure to continue?","Too Large Collection ("+collections.count()+" Rows)",YES_NO_OPTION, INFORMATION_MESSAGE);
-            if(ret!=YES_OPTION) return true;
+        if (collections.count() > 1000) {
+            int ret = JOptionPane.showConfirmDialog(this, "The table contains more than thousand row.\nThis may slow down the process and could cause Memory error.Are you sure to continue?", "Too Large Collection (" + collections.count() + " Rows)", YES_NO_OPTION, INFORMATION_MESSAGE);
+            if (ret != YES_OPTION) {
+                return true;
+            }
         }
         documents = collections.find().into(new ArrayList<Document>());
 
@@ -542,12 +548,20 @@ public class UserInterface extends javax.swing.JFrame {
 
     private void jComboBoxCollectionNamePopupMenuWillBecomeInvisible(javax.swing.event.PopupMenuEvent evt) {//GEN-FIRST:event_jComboBoxCollectionNamePopupMenuWillBecomeInvisible
         // TODO add your handling code here:
-        if(refreshTable()) return;
-        jButtonAddRow.setEnabled(true);
-        jButtonAddColumn.setEnabled(true);
-        jButtonRemoveColumn.setEnabled(true);
-        jButtonRefreshTable.setEnabled(true);
-        jButtonRemoveSelected.setEnabled(true);
+        new Thread(new Runnable() {
+            public void run() {
+                // code goes here.
+                if (refreshTable()) {
+                    return;
+                }
+                jButtonAddRow.setEnabled(true);
+                jButtonAddColumn.setEnabled(true);
+                jButtonRemoveColumn.setEnabled(true);
+                jButtonRefreshTable.setEnabled(true);
+                jButtonRemoveSelected.setEnabled(true);
+            }
+        }).start();
+
     }//GEN-LAST:event_jComboBoxCollectionNamePopupMenuWillBecomeInvisible
 
     private void jMenuItemRefreshActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jMenuItemRefreshActionPerformed
@@ -575,7 +589,7 @@ public class UserInterface extends javax.swing.JFrame {
         model.setRowCount(model.getRowCount() + 1);
         Document toBeInserted = new Document();
         collections.insertOne(toBeInserted);
-        if(model.getColumnCount()==0){
+        if (model.getColumnCount() == 0) {
             refreshTable();
             return;
         }
@@ -589,10 +603,10 @@ public class UserInterface extends javax.swing.JFrame {
 
     private void jButtonRemoveSelectedActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButtonRemoveSelectedActionPerformed
         // TODO add your handling code here:
-        
+
         int indexes[] = jTableResultTable.getSelectedRows();
         for (int row : indexes) {
-            Document where = new Document("_id",  model.getValueAt(row, _idcol));
+            Document where = new Document("_id", model.getValueAt(row, _idcol));
             collections.deleteOne(where);
         }
         refreshTable();
@@ -600,15 +614,21 @@ public class UserInterface extends javax.swing.JFrame {
 
     private void jButtonAddColumnActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButtonAddColumnActionPerformed
         // TODO add your handling code here:
-        String colName = JOptionPane.showInputDialog(this, "Enter New Column Name:", "New Column Info",QUESTION_MESSAGE);
-        if(colName==null) return;
-        String idName = JOptionPane.showInputDialog(this, "Enter _id of the document in which you want to add this column:", "New Column Info",QUESTION_MESSAGE);
-        if(colName==null) return;
-        String value = JOptionPane.showInputDialog(this, "Enter the value of _id = "+idName+":", "New Column Info",QUESTION_MESSAGE);
-        if(colName==null) return;
-        columnUpdating=true;
-        Document where = new Document("_id",  new ObjectId(idName));
-        Document what = new Document("$set", new Document((String) colName,value));
+        String colName = JOptionPane.showInputDialog(this, "Enter New Column Name:", "New Column Info", QUESTION_MESSAGE);
+        if (colName == null) {
+            return;
+        }
+        String idName = JOptionPane.showInputDialog(this, "Enter _id of the document in which you want to add this column:", "New Column Info", QUESTION_MESSAGE);
+        if (colName == null) {
+            return;
+        }
+        String value = JOptionPane.showInputDialog(this, "Enter the value of _id = " + idName + ":", "New Column Info", QUESTION_MESSAGE);
+        if (colName == null) {
+            return;
+        }
+        columnUpdating = true;
+        Document where = new Document("_id", new ObjectId(idName));
+        Document what = new Document("$set", new Document((String) colName, value));
         collections.updateOne(Filters.eq("_id", where.get("_id")), what);
         refreshTable();
         columnUpdating = false;
@@ -618,7 +638,7 @@ public class UserInterface extends javax.swing.JFrame {
         // TODO add your handling code here:
         int indexes[] = jTableResultTable.getSelectedColumns();
         for (int col : indexes) {
-            if(((String) columns[col]).equalsIgnoreCase("_id")){
+            if (((String) columns[col]).equalsIgnoreCase("_id")) {
                 JOptionPane.showMessageDialog(this, "_id could not be removed!", "Error in Column Deletion", ERROR_MESSAGE);
                 refreshTable();
                 columnUpdating = false;
@@ -626,8 +646,8 @@ public class UserInterface extends javax.swing.JFrame {
             }
             columnUpdating = true;
             Document where = new Document((String) columns[col], new Document("$exists", true));
-            Document what = new Document("$unset", new Document((String) columns[col],1));
-            collections.updateMany(where,what);
+            Document what = new Document("$unset", new Document((String) columns[col], 1));
+            collections.updateMany(where, what);
         }
         refreshTable();
         columnUpdating = false;
